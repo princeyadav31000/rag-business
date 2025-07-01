@@ -25,7 +25,7 @@ const RAGChatbot = () => {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  const API_BASE_URL = "http://localhost:5000";
+  const API_BASE_URL = "http://147.93.102.75:5000";
 
   useEffect(() => {
     checkServerHealth();
