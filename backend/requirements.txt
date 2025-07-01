@@ -1,0 +1,10 @@
+Flask
+flask-cors
+numpy
+sentence-transformers
+scikit-learn
+google-generativeai
+PyPDF2
+nltk
+spacy
+rank-bm25
