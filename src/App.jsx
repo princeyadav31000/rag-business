@@ -25,7 +25,7 @@ const RAGChatbot = () => {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  const API_BASE_URL = "http://147.93.102.75:5000";
+  const API_BASE_URL = "https://4289-2a02-4780-12-cc70-00-1.ngrok-free.app";
 
   useEffect(() => {
     checkServerHealth();
