@@ -1,4 +1,5 @@
 Flask
+vercel-python-wsgi
 flask-cors
 numpy
 sentence-transformers

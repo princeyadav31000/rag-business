@@ -846,21 +846,21 @@ def not_found(error):
 def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
-if __name__ == '__main__':
-    print("🚀 Starting RAG API Server...")
+# if __name__ == '__main__':
+#     print("🚀 Starting RAG API Server...")
     
-    # Initialize RAG model
-    if initialize_rag():
-        print("🎉 RAG model initialized successfully!")
-        print("📊 Available endpoints:")
-        print("  - GET  /health - Health check")
-        print("  - GET  /stats  - Get data statistics")
-        print("  - POST /chat   - Ask questions")
-        print("\n🌐 Starting server on http://localhost:5000")
-        app.run(debug=True, host='0.0.0.0', port=5000)
-    else:
-        print("❌ Failed to initialize RAG model. Please check your setup.")
-        print("Make sure you have:")
-        print("1. rag_model.pkl file in the same directory")
-        print("2. Valid Gemini API key")
-        print("3. All required Python packages installed")
+#     # Initialize RAG model
+#     if initialize_rag():
+#         print("🎉 RAG model initialized successfully!")
+#         print("📊 Available endpoints:")
+#         print("  - GET  /health - Health check")
+#         print("  - GET  /stats  - Get data statistics")
+#         print("  - POST /chat   - Ask questions")
+#         print("\n🌐 Starting server on http://localhost:5000")
+#         app.run(debug=True, host='0.0.0.0', port=5000)
+#     else:
+#         print("❌ Failed to initialize RAG model. Please check your setup.")
+#         print("Make sure you have:")
+#         print("1. rag_model.pkl file in the same directory")
+#         print("2. Valid Gemini API key")
+#         print("3. All required Python packages installed")
