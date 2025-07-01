@@ -52,7 +52,12 @@ const RAGChatbot = () => {
 
   const checkServerHealth = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/health`);
+      const response = await fetch(`${API_BASE_URL}/health`, {
+        method: "GET",
+        headers : {
+          "ngrok-skip-browser-warning": "true",
+        }
+      });
       const data = await response.json();
       setIsConnected(data.status === "healthy" && data.model_loaded);
     } catch (error) {
@@ -62,7 +67,12 @@ const RAGChatbot = () => {
 
   const loadStats = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/stats`);
+      const response = await fetch(`${API_BASE_URL}/stats`, {
+        method: "GET",
+        headers: {
+          "ngrok-skip-browser-warning": "true",
+        }
+      });
       const data = await response.json();
       setStats(data);
     } catch (error) {
@@ -88,6 +98,7 @@ const RAGChatbot = () => {
       const response = await fetch(`${API_BASE_URL}/chat`, {
         method: "POST",
         headers: {
+          "ngrok-skip-browser-warning": "true",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ message: inputMessage }),
