@@ -714,6 +714,13 @@ ANSWER:"""
         print(f"Error with Gemini: {e}")
         return None
 
+def combine_pdf_rag_context(pdf_results, rag_result, question):
+    """Combine PDF and RAG context for Gemini answer"""
+    pdf_context = "\n\n".join([result['content'] for result in pdf_results])
+    rag_context = rag_instance.prepare_context_for_gemini(rag_result, question)
+    combined_context = f"PDF Content:\n{pdf_context}\n\nRAG Content:\n{rag_context}"
+    return combined_context
+
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({
@@ -796,6 +803,7 @@ def chat():
             return jsonify({"error": "Message cannot be empty"}), 400
         
         pdf_response = None
+        pdf_results = []
         if search_mode in ['pdf', 'both'] and pdf_documents:
             pdf_results = search_pdf(query)
             print(f"PDF search results: {len(pdf_results)} found")
@@ -803,19 +811,52 @@ def chat():
                 pdf_response = answer_with_pdf_context(query, pdf_results)
 
         rag_response = None
+        rag_result = None
         if search_mode in ['rag', 'both']:
             rag_response = rag_instance.answer_question_with_gemini(query)
+            # For context, get the top result (if any)
+            results = rag_instance.search(query, top_k=1) if hasattr(rag_instance, 'search') else []
+            if results:
+                rag_result = results[0]
 
         final_response = None
+        pdf_score = pdf_response['score'] if pdf_response else 0.0
+        rag_score = rag_response['score'] if rag_response else 0.0
+        pdf_threshold = 0.3
+        rag_threshold = 0.1
         
         if search_mode == 'pdf' and pdf_response:
             final_response = pdf_response
         elif search_mode == 'rag' and rag_response:
             final_response = rag_response
         elif search_mode == 'both':
-            if pdf_response and pdf_response['score'] > 0.3:
+            # Both have good results
+            if pdf_response and rag_response and pdf_score > pdf_threshold and rag_score > rag_threshold:
+                # Combine both contexts and ask Gemini
+                combined_context = combine_pdf_rag_context(pdf_results, rag_result, query)
+                prompt = f"""You are a helpful assistant that answers questions based ONLY on the provided context. You must not use any external knowledge or information outside of what's given in the context.\n\nCONTEXT:\n{combined_context}\n\nQUESTION: {query}\n\nINSTRUCTIONS:\n1. Answer the question using ONLY the information provided in the context above\n2. If the context doesn't contain enough information to answer the question, say \"I don't have enough information in the provided context to answer this question.\"\n3. Be specific and detailed in your response when the context allows\n4. If there are links, URLs, or attachments mentioned in the context, include them in your response\n5. Structure your answer clearly and professionally\n6. Do not make up or infer information that isn't explicitly stated in the context\n\nANSWER:"""
+                try:
+                    response = rag_instance.gemini_model.generate_content(prompt)
+                    answer = response.text
+                    if "don't have enough information" in answer.lower() or "insufficient information" in answer.lower():
+                        # fallback to general knowledge
+                        final_response = rag_instance._answer_with_gemini_knowledge(query)
+                    else:
+                        final_response = {
+                            "answer": answer,
+                            "source": f"PDF: {pdf_results[0]['filename']} + RAG: {rag_result['metadata'].get('Name', 'Unknown') if rag_result else 'Unknown'}",
+                            "score": max(pdf_score, rag_score),
+                            "link": rag_result['metadata'].get('Link', None) if rag_result else None,
+                            "type": rag_result['metadata'].get('Type', None) if rag_result else None,
+                            "areas": rag_result['metadata'].get('Area', []) if rag_result else [],
+                            "source_type": "pdf+rag"
+                        }
+                except Exception as e:
+                    print(f"Error with Gemini (combined context): {e}")
+                    final_response = rag_instance._answer_with_gemini_knowledge(query)
+            elif pdf_response and pdf_score > pdf_threshold:
                 final_response = pdf_response
-            elif rag_response:
+            elif rag_response and rag_score > rag_threshold:
                 final_response = rag_response
             else:
                 final_response = pdf_response or rag_response

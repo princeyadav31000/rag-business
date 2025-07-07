@@ -13,6 +13,8 @@ import {
   BarChart3,
   Minimize2,
   Maximize2,
+  FileUp,
+  X as LucideX,
 } from "lucide-react";
 
 const RAGChatbot = () => {
@@ -24,8 +26,12 @@ const RAGChatbot = () => {
   const [showStats, setShowStats] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const [pdfFile, setPdfFile] = useState(null);
+  const [pdfStatus, setPdfStatus] = useState("");
+  const [searchMode, setSearchMode] = useState("both"); // 'rag', 'pdf', 'both'
 
   const API_BASE_URL = "https://4289-2a02-4780-12-cc70-00-1.ngrok-free.app";
+  // const API_BASE_URL = "http://localhost:5000";
 
   useEffect(() => {
     checkServerHealth();
@@ -40,6 +46,13 @@ const RAGChatbot = () => {
         timestamp: new Date().toISOString(),
       },
     ]);
+    // Automatically clear PDF data on page load
+    fetch(`${API_BASE_URL}/clear-pdf`, {
+      method: "POST",
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+      },
+    });
   }, []);
 
   useEffect(() => {
@@ -54,8 +67,8 @@ const RAGChatbot = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/health`, {
         method: "GET",
-        headers : {
-          "ngrok-skip-browser-warning": "true",
+        headers: {
+          "ngrok-skip-browser-warning": "true", // Skip ngrok warning
         }
       });
       const data = await response.json();
@@ -70,13 +83,62 @@ const RAGChatbot = () => {
       const response = await fetch(`${API_BASE_URL}/stats`, {
         method: "GET",
         headers: {
-          "ngrok-skip-browser-warning": "true",
+          "ngrok-skip-browser-warning": "true", // Skip ngrok warning
         }
       });
       const data = await response.json();
       setStats(data);
     } catch (error) {
       console.error("Failed to load stats:", error);
+    }
+  };
+
+  const handlePdfChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setPdfFile(file);
+    setPdfStatus("Uploading...");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(`${API_BASE_URL}/upload-pdf`, {
+        method: "POST",
+        headers: {
+          "ngrok-skip-browser-warning": "true",
+        },
+        body: formData,
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setPdfStatus(`Uploaded: ${data.filename} (${data.chunks_created} chunks)`);
+      } else {
+        setPdfStatus(`❌ ${data.error || "Failed to upload PDF"}`);
+        setPdfFile(null);
+      }
+    } catch (error) {
+      setPdfStatus(`❌ Error: ${error.message}`);
+      setPdfFile(null);
+    }
+  };
+
+  const handleClearPdf = async () => {
+    setPdfStatus("Clearing...");
+    try {
+      const response = await fetch(`${API_BASE_URL}/clear-pdf`, {
+        method: "POST",
+        headers: {
+          "ngrok-skip-browser-warning": "true",
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setPdfFile(null);
+        setPdfStatus("PDF cleared");
+      } else {
+        setPdfStatus(`❌ ${data.error || "Failed to clear PDF"}`);
+      }
+    } catch (error) {
+      setPdfStatus(`❌ Error: ${error.message}`);
     }
   };
 
@@ -101,7 +163,7 @@ const RAGChatbot = () => {
           "ngrok-skip-browser-warning": "true",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message: inputMessage }),
+        body: JSON.stringify({ message: inputMessage, search_mode: searchMode }),
       });
 
       const data = await response.json();
@@ -276,6 +338,34 @@ const RAGChatbot = () => {
 
       <StatsPanel />
 
+      {/* Search Mode Selection - Top Right */}
+      <div className="max-w-4xl mx-auto px-4 pt-4 flex justify-end">
+        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl shadow-sm px-3 py-2">
+          <span className="text-xs text-gray-500 mr-2 font-medium">Search Mode:</span>
+          <button
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors border ${searchMode === "rag" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-blue-50"}`}
+            onClick={() => setSearchMode("rag")}
+            disabled={isLoading}
+          >
+            RAG Only
+          </button>
+          <button
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors border ${searchMode === "pdf" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-blue-50"}`}
+            onClick={() => setSearchMode("pdf")}
+            disabled={isLoading}
+          >
+            PDF Only
+          </button>
+          <button
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors border ${searchMode === "both" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-blue-50"}`}
+            onClick={() => setSearchMode("both")}
+            disabled={isLoading}
+          >
+            Both
+          </button>
+        </div>
+      </div>
+
       {/* Main Chat Container */}
       <div className="max-w-4xl mx-auto px-4 py-6 h-[calc(100vh-88px)] flex flex-col">
         {/* Messages Area */}
@@ -418,8 +508,36 @@ const RAGChatbot = () => {
         </div>
 
         {/* Input Area */}
-        <div className="mt-4 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <div className="flex gap-3">
+        <div className="mt-4 bg-white rounded-xl border border-gray-200 shadow-sm p-3">
+          <div className="flex gap-2 items-end relative">
+            {/* PDF Upload Button */}
+            <div className="flex items-center">
+              <label htmlFor="pdf-upload" className="cursor-pointer flex items-center justify-center w-10 h-10 rounded-lg bg-gray-100 hover:bg-blue-100 border border-gray-200 transition-colors" title="Upload PDF">
+                <FileUp className="w-5 h-5 text-blue-600" />
+                <input
+                  id="pdf-upload"
+                  type="file"
+                  accept="application/pdf"
+                  onChange={handlePdfChange}
+                  disabled={isLoading}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            {/* PDF Filename and Clear */}
+            {pdfFile && (
+              <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-lg text-xs ml-1">
+                <span className="truncate max-w-[120px]">{pdfFile.name}</span>
+                <button onClick={handleClearPdf} className="ml-1 hover:text-red-600" title="Clear PDF" disabled={isLoading}>
+                  <LucideX className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            {/* PDF Status */}
+            {pdfStatus && !pdfFile && (
+              <div className="text-xs text-gray-500 ml-2">{pdfStatus}</div>
+            )}
+            {/* Chat Input */}
             <div className="flex-1 relative">
               <textarea
                 ref={inputRef}
@@ -450,16 +568,16 @@ const RAGChatbot = () => {
                 </kbd>
               </div>
             </div>
-
+            {/* Send Button */}
             <button
               onClick={sendMessage}
               disabled={!inputMessage.trim() || isLoading || !isConnected}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white p-3 rounded-xl transition-all duration-200 disabled:cursor-not-allowed shadow-sm hover:shadow-md active:transform active:scale-95"
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white p-3 rounded-xl transition-all duration-200 disabled:cursor-not-allowed shadow-sm hover:shadow-md active:transform active:scale-95 ml-1"
+              title="Send"
             >
               <Send className="w-5 h-5" />
             </button>
           </div>
-
           <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
             <div className="flex items-center gap-4">
               <span>💡 Be specific in your questions for better results</span>
